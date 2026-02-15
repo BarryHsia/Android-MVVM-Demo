@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.dagger.hilt.android")
+    id("kotlin-kapt")
 }
 
 android {
@@ -43,10 +45,21 @@ dependencies {
     
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    // LiveData
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
+    // Lifecycle runtime for repeatOnLifecycle
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     // Fragment
     implementation("androidx.fragment:fragment-ktx:1.6.2")
     // Activity KTX for viewModels()
     implementation("androidx.activity:activity-ktx:1.8.2")
+    
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.50")
+    kapt("com.google.dagger:hilt-android-compiler:2.50")
+    
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // Retrofit (for future network calls)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 }

@@ -1,17 +1,36 @@
-# Android MVVM 架构示例
+# Android MVVM 架构示例（现代化版本）
 
-这是一个使用 Kotlin 和 Google 推荐的 MVVM 架构模式的简单示例项目。
+这是一个使用 Kotlin 和 Google 最新推荐的 MVVM 架构模式的示例项目。
+
+## 技术栈
+
+- Kotlin
+- MVVM 架构
+- StateFlow（替代 LiveData）
+- Hilt 依赖注入
+- Kotlin Coroutines
+- ViewBinding
+- Repository 模式
 
 ## 项目结构
 
 ```
 app/src/main/java/com/example/mvvmdemo/
 ├── data/
-│   ├── model/          # 数据模型
-│   └── repository/     # 数据仓库层
+│   ├── model/              # 数据模型
+│   └── repository/         # 数据仓库层
+│       ├── UserRepository.kt       # Repository 接口
+│       └── UserRepositoryImpl.kt   # Repository 实现
+├── di/
+│   └── AppModule.kt        # Hilt 依赖注入模块
 ├── ui/
-│   └── user/          # UI 层（View + ViewModel）
-└── MainActivity.kt     # 主活动
+│   └── user/              # UI 层（View + ViewModel）
+│       ├── UserFragment.kt
+│       ├── UserViewModel.kt
+│       ├── UserAdapter.kt
+│       └── UserUiState.kt
+├── MvvmApplication.kt     # Application 类
+└── MainActivity.kt        # 主活动
 ```
 
 ## MVVM 架构说明
@@ -53,18 +72,85 @@ MVVM（Model-View-ViewModel）是一种软件架构模式，将应用分为三�
   - 显示数据
   - 将用户操作传递给 ViewModel
 
-## 依赖项
+## 核心特性
 
-在 `build.gradle.kts` 中添加以下依赖：
+### 1. StateFlow 替代 LiveData
+
+使用现代的 Kotlin Flow API，提供更强大的数据流操作。
 
 ```kotlin
+private val _uiState = MutableStateFlow<UserUiState>(UserUiState.Loading)
+val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
+```
+
+### 2. Hilt 依赖注入
+
+自动管理依赖，减少样板代码。
+
+```kotlin
+@HiltViewModel
+class UserViewModel @Inject constructor(
+    private val userRepository: UserRepository
+) : ViewModel()
+```
+
+### 3. 密封类表示 UI 状态
+
+类型安全的状态管理。
+
+```kotlin
+sealed class UserUiState {
+    object Loading : UserUiState()
+    object Empty : UserUiState()
+    data class Success(val users: List<User>) : UserUiState()
+    data class Error(val message: String) : UserUiState()
+}
+```
+
+### 4. Repository 接口
+
+依赖倒置原则，便于测试和扩展。
+
+```kotlin
+interface UserRepository {
+    fun getUsers(): Flow<Result<List<User>>>
+}
+```
+
+## 依赖项
+
+### Project build.gradle.kts
+
+```kotlin
+plugins {
+    id("com.android.application") version "8.2.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.20" apply false
+    id("com.google.dagger.hilt.android") version "2.50" apply false
+}
+```
+
+### App build.gradle.kts
+
+```kotlin
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("com.google.dagger.hilt.android")
+    id("kotlin-kapt")
+}
+
 dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    // LiveData
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
-    // Fragment
-    implementation("androidx.fragment:fragment-ktx:1.6.2")
+    // Lifecycle runtime
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.50")
+    kapt("com.google.dagger:hilt-android-compiler:2.50")
+    
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
 ```
 
@@ -80,30 +166,65 @@ dependencies {
 
 ## 使用示例
 
-1. **Fragment 观察数据**:
+### 1. Fragment 收集 StateFlow
+
 ```kotlin
-viewModel.users.observe(viewLifecycleOwner) { users ->
-    // 更新 UI
+viewLifecycleOwner.lifecycleScope.launch {
+    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewModel.uiState.collect { state ->
+            when (state) {
+                is UserUiState.Loading -> showLoading()
+                is UserUiState.Success -> showSuccess(state.users)
+                is UserUiState.Error -> showError(state.message)
+                is UserUiState.Empty -> showEmpty()
+            }
+        }
+    }
 }
 ```
 
-2. **触发数据加载**:
+### 2. ViewModel 使用 Hilt 注入
+
 ```kotlin
-viewModel.loadUsers()
+@HiltViewModel
+class UserViewModel @Inject constructor(
+    private val userRepository: UserRepository
+) : ViewModel() {
+    // ViewModel 代码
+}
 ```
 
-3. **ViewModel 自动保留数据**: 屏幕旋转时数据不会丢失
+### 3. Repository 返回 Flow
+
+```kotlin
+override fun getUsers(): Flow<Result<List<User>>> = flow {
+    try {
+        val users = fetchUsersFromNetwork()
+        emit(Result.success(users))
+    } catch (e: Exception) {
+        emit(Result.failure(e))
+    }
+}
+```
 
 ## 最佳实践
 
 1. ViewModel 不应持有 View、Activity 或 Context 的引用
-2. 使用 LiveData 或 StateFlow 暴露数据
-3. Repository 负责决定数据来源
-4. 保持 ViewModel 的可测试性
-5. 使用 ViewModelFactory 传递参数（如果需要）
+2. 使用 StateFlow 暴露数据（现代化方式）
+3. 使用 Hilt 进行依赖注入
+4. Repository 使用接口，便于测试和扩展
+5. 使用密封类表示 UI 状态
+6. 使用 repeatOnLifecycle 收集 Flow，确保生命周期安全
+7. 使用 Result 类型处理成功和失败情况
+
+## 重构说明
+
+本项目已从 LiveData 升级到 StateFlow，并引入了 Hilt 依赖注入。详细的重构说明请查看 [重构说明.md](./重构说明.md)。
 
 ## 学习资源
 
 - [Android 官方架构指南](https://developer.android.com/topic/architecture)
 - [ViewModel 概览](https://developer.android.com/topic/libraries/architecture/viewmodel)
-- [LiveData 概览](https://developer.android.com/topic/libraries/architecture/livedata)
+- [StateFlow 和 SharedFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow)
+- [Hilt 依赖注入](https://developer.android.com/training/dependency-injection/hilt-android)
+- [Kotlin Flow 官方文档](https://kotlinlang.org/docs/flow.html)

@@ -1,42 +1,31 @@
 package com.example.mvvmdemo.data.repository
 
 import com.example.mvvmdemo.data.model.User
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 
 /**
- * 用户数据仓库
- * Repository 层负责数据获取，是 ViewModel 和数据源之间的中介
+ * 用户数据仓库接口
  * 
- * 职责：
- * - 决定数据来源（网络、数据库、缓存等）
- * - 提供干净的 API 给 ViewModel
- * - 处理数据转换和缓存逻辑
+ * 使用接口的好处：
+ * - 便于单元测试（可以创建 Mock 实现）
+ * - 符合依赖倒置原则
+ * - 便于切换不同的实现
  */
-class UserRepository {
+interface UserRepository {
     
     /**
      * 获取用户列表
-     * 实际项目中，这里会从网络 API 或数据库获取数据
-     * 这里使用模拟数据演示
+     * 返回 Flow 以支持响应式数据流
      */
-    suspend fun getUsers(): List<User> {
-        // 模拟网络延迟
-        delay(1000)
-        
-        // 返回模拟数据
-        return listOf(
-            User(1, "张三", "zhangsan@example.com"),
-            User(2, "李四", "lisi@example.com"),
-            User(3, "王五", "wangwu@example.com"),
-            User(4, "赵六", "zhaoliu@example.com")
-        )
-    }
+    fun getUsers(): Flow<Result<List<User>>>
     
     /**
      * 根据 ID 获取用户
      */
-    suspend fun getUserById(id: Int): User? {
-        delay(500)
-        return getUsers().find { it.id == id }
-    }
+    suspend fun getUserById(id: Int): Result<User?>
+    
+    /**
+     * 刷新用户数据
+     */
+    suspend fun refreshUsers(): Result<List<User>>
 }
