@@ -373,7 +373,33 @@ viewLifecycleOwner.lifecycleScope.launch {
 }
 ```
 
-### 2. 依赖注入
+### 2. DataBinding vs ViewBinding
+
+**ViewBinding（当前项目使用）:**
+- 轻量级，编译快
+- 类型安全
+- 需要手动更新 UI
+
+**DataBinding（更适合 MVVM）:**
+- XML 中直接绑定 ViewModel
+- 支持双向绑定
+- 真正的数据驱动 UI
+
+```xml
+<!-- DataBinding 示例 -->
+<layout>
+    <data>
+        <variable name="viewModel" type="...UserViewModel" />
+    </data>
+    
+    <TextView android:text="@{viewModel.userName}" />
+    <ProgressBar android:visibility="@{viewModel.isLoading ? View.VISIBLE : View.GONE}" />
+</layout>
+```
+
+详细对比请查看项目中的 `DataBinding使用说明.md`。
+
+### 3. 依赖注入
 
 使用 Hilt 或 Koin 进行依赖注入：
 
@@ -384,7 +410,7 @@ class UserViewModel @Inject constructor(
 ) : ViewModel()
 ```
 
-### 3. 单元测试
+### 4. 单元测试
 
 ```kotlin
 class UserViewModelTest {
@@ -404,11 +430,13 @@ class UserViewModelTest {
 1. ✅ 理解 MVVM 基本概念
 2. ✅ 掌握 LiveData 和 ViewModel
 3. ✅ 学习协程和 viewModelScope
-4. ⬜ 学习 StateFlow 和 Kotlin Flow
-5. ⬜ 掌握依赖注入（Hilt）
-6. ⬜ 学习 Room 数据库
-7. ⬜ 学习 Retrofit 网络请求
-8. ⬜ 掌握单元测试
+4. ✅ 学习 StateFlow 和 Kotlin Flow
+5. ✅ 掌握依赖注入（Hilt）
+6. ✅ 理解 ViewBinding 和 DataBinding 的区别
+7. ⬜ 学习 Room 数据库
+8. ⬜ 学习 Retrofit 网络请求
+9. ⬜ 掌握单元测试
+10. ⬜ 学习 Jetpack Compose（未来趋势）
 
 ## 九、常见陷阱和解决方案
 

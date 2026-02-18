@@ -9,7 +9,7 @@
 - StateFlow（替代 LiveData）
 - Hilt 依赖注入
 - Kotlin Coroutines
-- ViewBinding
+- ViewBinding / DataBinding（提供两种实现）
 - Repository 模式
 
 ## 项目结构
@@ -117,6 +117,23 @@ interface UserRepository {
 }
 ```
 
+### 5. ViewBinding 和 DataBinding 双实现
+
+项目同时提供 ViewBinding 和 DataBinding 两种实现方式：
+
+**ViewBinding（推荐用于简单场景）:**
+- 轻量级，编译快
+- 类型安全
+- 适合简单 UI
+
+**DataBinding（推荐用于 MVVM）:**
+- 真正的数据驱动 UI
+- XML 中直接绑定 ViewModel
+- 支持双向绑定
+- 减少样板代码
+
+详细对比请查看 [DataBinding使用说明.md](./DataBinding使用说明.md)
+
 ## 依赖项
 
 ### Project build.gradle.kts
@@ -216,6 +233,7 @@ override fun getUsers(): Flow<Result<List<User>>> = flow {
 5. 使用密封类表示 UI 状态
 6. 使用 repeatOnLifecycle 收集 Flow，确保生命周期安全
 7. 使用 Result 类型处理成功和失败情况
+8. 根据场景选择 ViewBinding 或 DataBinding
 
 ## 重构说明
 
@@ -262,13 +280,27 @@ if (cachedUsers != users) {
 
 StateFlow 是 Kotlin Flow 的一部分，提供更强大的操作符和更好的协程集成。
 
-### Q2: 如何添加网络请求？
+### Q2: ViewBinding 和 DataBinding 应该选择哪个？
+
+- **ViewBinding**: 适合简单项目，编译快，学习成本低
+- **DataBinding**: 适合 MVVM 项目，真正的数据驱动 UI，支持双向绑定
+
+详细对比请查看 [DataBinding使用说明.md](./DataBinding使用说明.md)
+
+### Q3: 如何添加网络请求？
 
 取消注释 Retrofit 依赖，在 Repository 中注入 ApiService，替换模拟数据。
 
-### Q3: 如何添加数据库支持？
+### Q4: 如何添加数据库支持？
 
 添加 Room 依赖，创建 DAO 和 Database，在 Repository 中实现缓存逻辑。
+
+## 项目文档
+
+- [README.md](./README.md) - 项目概述和快速入门
+- [MVVM架构学习指南.md](./MVVM架构学习指南.md) - 详细的 MVVM 架构学习文档
+- [重构说明.md](./重构说明.md) - 从 LiveData 到 StateFlow 的重构说明
+- [DataBinding使用说明.md](./DataBinding使用说明.md) - DataBinding vs ViewBinding 对比
 
 ## 学习资源
 
@@ -277,3 +309,4 @@ StateFlow 是 Kotlin Flow 的一部分，提供更强大的操作符和更好的
 - [StateFlow 和 SharedFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow)
 - [Hilt 依赖注入](https://developer.android.com/training/dependency-injection/hilt-android)
 - [Kotlin Flow 官方文档](https://kotlinlang.org/docs/flow.html)
+- [DataBinding 官方文档](https://developer.android.com/topic/libraries/data-binding)
