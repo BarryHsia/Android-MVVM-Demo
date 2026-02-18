@@ -410,9 +410,223 @@ class UserViewModelTest {
 7. ⬜ 学习 Retrofit 网络请求
 8. ⬜ 掌握单元测试
 
-## 九、参考资源
+## 九、常见陷阱和解决方案
+
+### 1. 重复加载问题
+
+**问题：** ViewModel 在 `init` 中自动加载数据，如果多次创建可能导致重复请求。
+
+**解决方案：**
+```kotlin
+private var isLoading = false
+
+fun loadUsers() {
+    if (isLoading) return
+    isLoading = true
+    
+    viewModelScope.launch {
+        try {
+            // 加载逻辑
+        } finally {
+            isLoading = false
+        }
+    }
+}
+```
+
+### 2. 缓存数据导致 UI 闪烁
+
+**问题：** Repository 先发送缓存数据，再发送网络数据，导致 UI 快速更新两次。
+
+**解决方案：**
+```kotlin
+override fun getUsers(): Flow<Result<List<User>>> = flow {
+    cachedUsers?.let { emit(Result.success(it)) }
+    
+    val users = fetchUsersFromNetwork()
+    
+    // 只有数据变化时才发送
+    if (cachedUsers != users) {
+        cachedUsers = users
+        emit(Result.success(users))
+    }
+}
+```
+
+### 3. Fragment 生命周期问题
+
+**问题：** 使用 `lifecycleScope` 而不是 `viewLifecycleOwner.lifecycleScope` 可能导致内存泄漏。
+
+**解决方案：**
+```kotlin
+// ✅ 正确
+viewLifecycleOwner.lifecycleScope.launch {
+    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewModel.uiState.collect { state ->
+            handleUiState(state)
+        }
+    }
+}
+
+// ❌ 错误
+lifecycleScope.launch {
+    viewModel.uiState.collect { state ->
+        handleUiState(state)
+    }
+}
+```
+
+### 4. 错误处理不够细致
+
+**问题：** 所有错误都显示相同的消息，用户体验不好。
+
+**解决方案：**
+```kotlin
+sealed class UserUiState {
+    object Loading : UserUiState()
+    object Empty : UserUiState()
+    data class Success(val users: List<User>) : UserUiState()
+    data class Error(
+        val message: String,
+        val type: ErrorType = ErrorType.UNKNOWN
+    ) : UserUiState()
+}
+
+enum class ErrorType {
+    NETWORK,    // 网络错误
+    SERVER,     // 服务器错误
+    DATABASE,   // 数据库错误
+    UNKNOWN     // 未知错误
+}
+```
+
+### 5. ViewBinding 内存泄漏
+
+**问题：** 忘记在 `onDestroyView` 中清空 binding。
+
+**解决方案：**
+```kotlin
+private var _binding: FragmentUserBinding? = null
+private val binding get() = _binding!!
+
+override fun onDestroyView() {
+    super.onDestroyView()
+    _binding = null  // 必须清空
+}
+```
+
+## 十、性能优化建议
+
+### 1. 使用 DiffUtil
+
+RecyclerView 使用 `ListAdapter` 自动处理差异计算，提高性能。
+
+### 2. 避免在主线程执行耗时操作
+
+所有数据处理都在协程中执行，使用 `Dispatchers.IO` 处理 IO 操作。
+
+### 3. 合理使用缓存
+
+Repository 层实现缓存策略，减少网络请求。
+
+### 4. 懒加载
+
+只在需要时加载数据，避免不必要的资源消耗。
+
+## 十一、单元测试示例
+
+### ViewModel 测试
+
+```kotlin
+@ExperimentalCoroutinesApi
+class UserViewModelTest {
+    
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+    
+    private lateinit var viewModel: UserViewModel
+    private lateinit var mockRepository: UserRepository
+    
+    @Before
+    fun setup() {
+        mockRepository = mockk()
+        viewModel = UserViewModel(mockRepository)
+    }
+    
+    @Test
+    fun `loadUsers should emit loading then success state`() = runTest {
+        // Given
+        val users = listOf(User(1, "Test", "test@example.com"))
+        coEvery { mockRepository.getUsers() } returns flowOf(Result.success(users))
+        
+        // When
+        viewModel.loadUsers()
+        
+        // Then
+        val state = viewModel.uiState.value
+        assertTrue(state is UserUiState.Success)
+        assertEquals(users, (state as UserUiState.Success).users)
+    }
+    
+    @Test
+    fun `loadUsers should emit error state on failure`() = runTest {
+        // Given
+        val exception = Exception("Network error")
+        coEvery { mockRepository.getUsers() } returns flowOf(Result.failure(exception))
+        
+        // When
+        viewModel.loadUsers()
+        
+        // Then
+        val state = viewModel.uiState.value
+        assertTrue(state is UserUiState.Error)
+    }
+}
+```
+
+### Repository 测试
+
+```kotlin
+@ExperimentalCoroutinesApi
+class UserRepositoryImplTest {
+    
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+    
+    private lateinit var repository: UserRepositoryImpl
+    
+    @Before
+    fun setup() {
+        repository = UserRepositoryImpl()
+    }
+    
+    @Test
+    fun `getUsers should return success result`() = runTest {
+        // When
+        val results = repository.getUsers().toList()
+        
+        // Then
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.last().isSuccess)
+    }
+    
+    @Test
+    fun `refreshUsers should update cache`() = runTest {
+        // When
+        val result = repository.refreshUsers()
+        
+        // Then
+        assertTrue(result.isSuccess)
+        assertNotNull(result.getOrNull())
+    }
+}
+```
+
+## 十二、参考资源
 
 - [Android 官方架构指南](https://developer.android.com/topic/architecture)
 - [ViewModel 概览](https://developer.android.com/topic/libraries/architecture/viewmodel)
-- [LiveData 概览](https://developer.android.com/topic/libraries/architecture/livedata)
+- [StateFlow 和 SharedFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow)
 - [Kotlin 协程](https://developer.android.com/kotlin/coroutines)
+- [Hilt 依赖注入](https://developer.android.com/training/dependency-injection/hilt-android)
+- [单元测试最佳实践](https://developer.android.com/training/testing/unit-testing)

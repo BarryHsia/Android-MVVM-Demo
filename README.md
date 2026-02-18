@@ -221,6 +221,55 @@ override fun getUsers(): Flow<Result<List<User>>> = flow {
 
 本项目已从 LiveData 升级到 StateFlow，并引入了 Hilt 依赖注入。详细的重构说明请查看 [重构说明.md](./重构说明.md)。
 
+## 注意事项和最佳实践
+
+### 1. 防止重复加载
+
+在 ViewModel 中添加加载标志，防止并发请求：
+
+```kotlin
+private var isLoading = false
+
+fun loadUsers() {
+    if (isLoading) return
+    isLoading = true
+    // ... 加载逻辑
+}
+```
+
+### 2. 缓存策略
+
+Repository 中的缓存数据应该与新数据对比，避免不必要的 UI 更新：
+
+```kotlin
+// 只有数据真正变化时才发送
+if (cachedUsers != users) {
+    emit(Result.success(users))
+}
+```
+
+### 3. 错误类型区分
+
+建议区分不同类型的错误（网络错误、服务器错误等），提供更好的用户体验。
+
+### 4. 单元测试
+
+项目结构支持单元测试，建议为 ViewModel 和 Repository 添加测试用例。
+
+## 常见问题
+
+### Q1: 为什么使用 StateFlow 而不是 LiveData？
+
+StateFlow 是 Kotlin Flow 的一部分，提供更强大的操作符和更好的协程集成。
+
+### Q2: 如何添加网络请求？
+
+取消注释 Retrofit 依赖，在 Repository 中注入 ApiService，替换模拟数据。
+
+### Q3: 如何添加数据库支持？
+
+添加 Room 依赖，创建 DAO 和 Database，在 Repository 中实现缓存逻辑。
+
 ## 学习资源
 
 - [Android 官方架构指南](https://developer.android.com/topic/architecture)
