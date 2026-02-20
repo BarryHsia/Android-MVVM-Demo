@@ -30,8 +30,8 @@ class UserFragmentDataBinding : Fragment() {
     private var _binding: FragmentUserDatabindingBinding? = null
     private val binding get() = _binding!!
     
-    // ViewModel
-    private val viewModel: UserViewModelDataBinding by viewModels()
+    // ViewModel - 使用 UserViewModel 而不是 UserViewModelDataBinding
+    private val viewModel: UserViewModel by viewModels()
     
     // RecyclerView 适配器
     private lateinit var adapter: UserAdapterDataBinding
@@ -78,23 +78,51 @@ class UserFragmentDataBinding : Fragment() {
     
     /**
      * 观察 UI 状态
-     * 注意：使用 DataBinding 后，大部分 UI 更新都在 XML 中自动完成
-     * 这里只需要处理 RecyclerView 的数据更新
      */
     private fun observeUiState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     when (state) {
+                        is UserUiState.Loading -> {
+                            binding.progressBar.visibility = View.VISIBLE
+                            binding.errorLayout.visibility = View.GONE
+                            binding.emptyLayout.visibility = View.GONE
+                            binding.swipeRefresh.isRefreshing = false
+                        }
                         is UserUiState.Success -> {
+                            binding.progressBar.visibility = View.GONE
+                            binding.errorLayout.visibility = View.GONE
+                            binding.emptyLayout.visibility = View.GONE
+                            binding.swipeRefresh.isRefreshing = false
                             adapter.submitList(state.users)
                         }
-                        else -> {
-                            // 其他状态由 DataBinding 在 XML 中自动处理
+                        is UserUiState.Error -> {
+                            binding.progressBar.visibility = View.GONE
+                            binding.errorLayout.visibility = View.VISIBLE
+                            binding.emptyLayout.visibility = View.GONE
+                            binding.swipeRefresh.isRefreshing = false
+                            binding.textError.text = state.message
+                        }
+                        is UserUiState.Empty -> {
+                            binding.progressBar.visibility = View.GONE
+                            binding.errorLayout.visibility = View.GONE
+                            binding.emptyLayout.visibility = View.VISIBLE
+                            binding.swipeRefresh.isRefreshing = false
                         }
                     }
                 }
             }
+        }
+        
+        // 设置下拉刷新监听
+        binding.swipeRefresh.setOnRefreshListener {
+            viewModel.refreshUsers()
+        }
+        
+        // 设置重试按钮监听
+        binding.btnRetry.setOnClickListener {
+            viewModel.retry()
         }
     }
     

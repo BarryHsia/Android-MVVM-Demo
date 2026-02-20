@@ -338,10 +338,10 @@ fun loadUsers() {
 - **ViewModel**: 持有 UI 相关的数据，处理 UI 逻辑
 - **Repository**: 负责数据获取，决定数据来源
 
-### Q2: 为什么要区分 MutableLiveData 和 LiveData？
+### Q2: 为什么要区分 MutableStateFlow 和 StateFlow？
 
-- **MutableLiveData**: 可以修改值，只在 ViewModel 内部使用
-- **LiveData**: 只读，暴露给 View，防止 View 直接修改数据
+- **MutableStateFlow**: 可以修改值，只在 ViewModel 内部使用
+- **StateFlow**: 只读，暴露给 View，防止 View 直接修改数据
 
 ### Q3: 什么时候使用 viewModelScope？
 
@@ -354,55 +354,55 @@ fun loadUsers() {
 - 更好的生命周期管理
 - 便于复用和导航
 
+### Q5: 为什么使用 StateFlow 而不是 LiveData？
+
+StateFlow 的优势：
+- 更强大的操作符（map, filter, combine 等）
+- 更好的协程集成
+- 类型安全，编译时检查
+- 更现代的 API 设计
+- 支持冷流和热流的转换
+
 ## 七、进阶主题
 
-### 1. StateFlow vs LiveData
+### 1. StateFlow - 现代化的状态管理
 
 StateFlow 是 Kotlin Flow 的一部分，是 LiveData 的现代替代品。
 
-```kotlin
-// StateFlow
-private val _users = MutableStateFlow<List<User>>(emptyList())
-val users: StateFlow<List<User>> = _users.asStateFlow()
+**优势：**
+- 更强大的操作符支持
+- 更好的协程集成
+- 类型安全
+- 支持冷流和热流
 
-// 在 View 中收集
+**使用示例：**
+```kotlin
+// ViewModel
+private val _uiState = MutableStateFlow<UserUiState>(UserUiState.Loading)
+val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
+
+// Fragment 中收集
 viewLifecycleOwner.lifecycleScope.launch {
-    viewModel.users.collect { users ->
-        // 更新 UI
+    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewModel.uiState.collect { state ->
+            when (state) {
+                is UserUiState.Loading -> showLoading()
+                is UserUiState.Success -> showSuccess(state.users)
+                is UserUiState.Error -> showError(state.message)
+                is UserUiState.Empty -> showEmpty()
+            }
+        }
     }
 }
 ```
 
-### 2. DataBinding vs ViewBinding
+**重要：** 使用 `repeatOnLifecycle` 确保只在生命周期活跃时收集数据，避免内存泄漏。
 
-**ViewBinding（当前项目使用）:**
-- 轻量级，编译快
-- 类型安全
-- 需要手动更新 UI
+### 2. 依赖注入 - Hilt
 
-**DataBinding（更适合 MVVM）:**
-- XML 中直接绑定 ViewModel
-- 支持双向绑定
-- 真正的数据驱动 UI
+Hilt 是 Google 推荐的依赖注入框架，基于 Dagger。
 
-```xml
-<!-- DataBinding 示例 -->
-<layout>
-    <data>
-        <variable name="viewModel" type="...UserViewModel" />
-    </data>
-    
-    <TextView android:text="@{viewModel.userName}" />
-    <ProgressBar android:visibility="@{viewModel.isLoading ? View.VISIBLE : View.GONE}" />
-</layout>
-```
-
-详细对比请查看项目中的 `DataBinding使用说明.md`。
-
-### 3. 依赖注入
-
-使用 Hilt 或 Koin 进行依赖注入：
-
+**ViewModel 注入：**
 ```kotlin
 @HiltViewModel
 class UserViewModel @Inject constructor(
@@ -410,29 +410,79 @@ class UserViewModel @Inject constructor(
 ) : ViewModel()
 ```
 
-### 4. 单元测试
-
+**Repository 注入：**
 ```kotlin
-class UserViewModelTest {
-    @Test
-    fun `loadUsers should update users LiveData`() = runTest {
-        val viewModel = UserViewModel()
-        viewModel.loadUsers()
-        
-        val users = viewModel.users.getOrAwaitValue()
-        assertThat(users).isNotEmpty()
+@Module
+@InstallIn(SingletonComponent::class)
+object AppModule {
+    
+    @Provides
+    @Singleton
+    fun provideUserRepository(): UserRepository {
+        return UserRepositoryImpl()
     }
+}
+```
+
+**Application 配置：**
+```kotlin
+@HiltAndroidApp
+class MvvmApplication : Application()
+```
+
+### 3. KSP 替代 kapt
+
+KSP (Kotlin Symbol Processing) 是 Google 推荐的注解处理方案。
+
+**优势：**
+- 编译速度提升 2 倍以上
+- 更低的内存占用
+- 更好的 Kotlin 支持
+
+**配置：**
+```kotlin
+plugins {
+    id("com.google.devtools.ksp") version "1.9.25-1.0.20"
+}
+
+dependencies {
+    ksp("com.google.dagger:hilt-compiler:2.51.1")
+}
+```
+
+### 4. Version Catalog
+
+使用 Gradle Version Catalog 统一管理依赖版本。
+
+**gradle/libs.versions.toml：**
+```toml
+[versions]
+kotlin = "1.9.25"
+hilt = "2.51.1"
+
+[libraries]
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+
+[plugins]
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+```
+
+**使用：**
+```kotlin
+dependencies {
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 }
 ```
 
 ## 八、学习路径
 
 1. ✅ 理解 MVVM 基本概念
-2. ✅ 掌握 LiveData 和 ViewModel
+2. ✅ 掌握 ViewModel 和 Repository
 3. ✅ 学习协程和 viewModelScope
 4. ✅ 学习 StateFlow 和 Kotlin Flow
 5. ✅ 掌握依赖注入（Hilt）
-6. ✅ 理解 ViewBinding 和 DataBinding 的区别
+6. ✅ 理解 KSP 和 Version Catalog
 7. ⬜ 学习 Room 数据库
 8. ⬜ 学习 Retrofit 网络请求
 9. ⬜ 掌握单元测试
@@ -487,7 +537,7 @@ override fun getUsers(): Flow<Result<List<User>>> = flow {
 
 **解决方案：**
 ```kotlin
-// ✅ 正确
+// ✅ 正确 - 使用 repeatOnLifecycle
 viewLifecycleOwner.lifecycleScope.launch {
     viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
         viewModel.uiState.collect { state ->
@@ -496,13 +546,19 @@ viewLifecycleOwner.lifecycleScope.launch {
     }
 }
 
-// ❌ 错误
+// ❌ 错误 - 可能导致内存泄漏
 lifecycleScope.launch {
     viewModel.uiState.collect { state ->
         handleUiState(state)
     }
 }
 ```
+
+**为什么要使用 repeatOnLifecycle？**
+- 确保只在生命周期活跃时收集数据
+- Fragment 在后台时自动停止收集
+- 返回前台时自动恢复收集
+- 避免在 Fragment 销毁后更新 UI
 
 ### 4. 错误处理不够细致
 
@@ -561,93 +617,43 @@ Repository 层实现缓存策略，减少网络请求。
 
 只在需要时加载数据，避免不必要的资源消耗。
 
-## 十一、单元测试示例
+## 十一、项目实践总结
 
-### ViewModel 测试
+### 本项目的技术选型
 
-```kotlin
-@ExperimentalCoroutinesApi
-class UserViewModelTest {
-    
-    @get:Rule
-    val mainDispatcherRule = MainDispatcherRule()
-    
-    private lateinit var viewModel: UserViewModel
-    private lateinit var mockRepository: UserRepository
-    
-    @Before
-    fun setup() {
-        mockRepository = mockk()
-        viewModel = UserViewModel(mockRepository)
-    }
-    
-    @Test
-    fun `loadUsers should emit loading then success state`() = runTest {
-        // Given
-        val users = listOf(User(1, "Test", "test@example.com"))
-        coEvery { mockRepository.getUsers() } returns flowOf(Result.success(users))
-        
-        // When
-        viewModel.loadUsers()
-        
-        // Then
-        val state = viewModel.uiState.value
-        assertTrue(state is UserUiState.Success)
-        assertEquals(users, (state as UserUiState.Success).users)
-    }
-    
-    @Test
-    fun `loadUsers should emit error state on failure`() = runTest {
-        // Given
-        val exception = Exception("Network error")
-        coEvery { mockRepository.getUsers() } returns flowOf(Result.failure(exception))
-        
-        // When
-        viewModel.loadUsers()
-        
-        // Then
-        val state = viewModel.uiState.value
-        assertTrue(state is UserUiState.Error)
-    }
-}
+1. **StateFlow 替代 LiveData** - 更现代的响应式方案
+2. **KSP 替代 kapt** - 更快的编译速度
+3. **Hilt 依赖注入** - 自动化的依赖管理
+4. **Version Catalog** - 统一的依赖版本管理
+5. **密封类状态管理** - 类型安全的 UI 状态
+6. **Repository 模式** - 清晰的数据层抽象
+
+### 编译和运行
+
+**环境要求：**
+- JDK 11 或更高版本（推荐 JDK 21）
+- Android Studio Hedgehog 或更高版本
+- Android SDK 34
+
+**编译命令：**
+```bash
+# Windows
+.\gradlew.bat build
+
+# 编译 Debug APK
+.\gradlew.bat assembleDebug
 ```
 
-### Repository 测试
+**安装到设备：**
+```bash
+# 启动模拟器
+emulator -avd Pixel_9_Pro_XL
 
-```kotlin
-@ExperimentalCoroutinesApi
-class UserRepositoryImplTest {
-    
-    @get:Rule
-    val mainDispatcherRule = MainDispatcherRule()
-    
-    private lateinit var repository: UserRepositoryImpl
-    
-    @Before
-    fun setup() {
-        repository = UserRepositoryImpl()
-    }
-    
-    @Test
-    fun `getUsers should return success result`() = runTest {
-        // When
-        val results = repository.getUsers().toList()
-        
-        // Then
-        assertTrue(results.isNotEmpty())
-        assertTrue(results.last().isSuccess)
-    }
-    
-    @Test
-    fun `refreshUsers should update cache`() = runTest {
-        // When
-        val result = repository.refreshUsers()
-        
-        // Then
-        assertTrue(result.isSuccess)
-        assertNotNull(result.getOrNull())
-    }
-}
+# 安装 APK
+adb install app\build\outputs\apk\debug\app-debug.apk
+
+# 启动应用
+adb shell am start -n com.example.mvvmdemo/.MainActivity
 ```
 
 ## 十二、参考资源
@@ -657,4 +663,6 @@ class UserRepositoryImplTest {
 - [StateFlow 和 SharedFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow)
 - [Kotlin 协程](https://developer.android.com/kotlin/coroutines)
 - [Hilt 依赖注入](https://developer.android.com/training/dependency-injection/hilt-android)
-- [单元测试最佳实践](https://developer.android.com/training/testing/unit-testing)
+- [KSP 文档](https://kotlinlang.org/docs/ksp-overview.html)
+- [Version Catalog](https://docs.gradle.org/current/userguide/platforms.html)
+- [Kotlin Flow 官方文档](https://kotlinlang.org/docs/flow.html)

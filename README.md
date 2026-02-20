@@ -1,16 +1,18 @@
-# Android MVVM 架构示例（现代化版本）
+# Android MVVM 架构示例
 
 这是一个使用 Kotlin 和 Google 最新推荐的 MVVM 架构模式的示例项目。
 
 ## 技术栈
 
-- Kotlin
-- MVVM 架构
-- StateFlow（替代 LiveData）
-- Hilt 依赖注入
-- Kotlin Coroutines
-- ViewBinding / DataBinding（提供两种实现）
-- Repository 模式
+- **Kotlin 1.9.25** - 现代化的 Android 开发语言
+- **MVVM 架构** - 清晰的架构分层
+- **StateFlow** - 替代 LiveData 的现代响应式方案
+- **Hilt 2.51.1** - 依赖注入框架
+- **Kotlin Coroutines 1.9.0** - 异步编程
+- **KSP** - 替代 kapt 的注解处理器，编译更快
+- **ViewBinding** - 类型安全的视图绑定
+- **Version Catalog** - 统一的依赖管理
+- **Repository 模式** - 数据层抽象
 
 ## 项目结构
 
@@ -76,7 +78,7 @@ MVVM（Model-View-ViewModel）是一种软件架构模式，将应用分为三�
 
 ### 1. StateFlow 替代 LiveData
 
-使用现代的 Kotlin Flow API，提供更强大的数据流操作。
+使用现代的 Kotlin Flow API，提供更强大的数据流操作和更好的协程集成。
 
 ```kotlin
 private val _uiState = MutableStateFlow<UserUiState>(UserUiState.Loading)
@@ -85,7 +87,7 @@ val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
 
 ### 2. Hilt 依赖注入
 
-自动管理依赖，减少样板代码。
+自动管理依赖，减少样板代码，提高可测试性。
 
 ```kotlin
 @HiltViewModel
@@ -96,7 +98,7 @@ class UserViewModel @Inject constructor(
 
 ### 3. 密封类表示 UI 状态
 
-类型安全的状态管理。
+类型安全的状态管理，编译时检查所有分支。
 
 ```kotlin
 sealed class UserUiState {
@@ -107,67 +109,60 @@ sealed class UserUiState {
 }
 ```
 
-### 4. Repository 接口
+### 4. Repository 模式
 
 依赖倒置原则，便于测试和扩展。
 
 ```kotlin
 interface UserRepository {
     fun getUsers(): Flow<Result<List<User>>>
+    suspend fun refreshUsers(): Result<List<User>>
 }
 ```
 
-### 5. ViewBinding 和 DataBinding 双实现
+### 5. KSP 替代 kapt
 
-项目同时提供 ViewBinding 和 DataBinding 两种实现方式：
+使用 Kotlin Symbol Processing (KSP) 替代 kapt，编译速度提升 2 倍以上。
 
-**ViewBinding（推荐用于简单场景）:**
-- 轻量级，编译快
-- 类型安全
-- 适合简单 UI
+### 6. Version Catalog
 
-**DataBinding（推荐用于 MVVM）:**
-- 真正的数据驱动 UI
-- XML 中直接绑定 ViewModel
-- 支持双向绑定
-- 减少样板代码
+使用 Gradle Version Catalog 统一管理依赖版本，避免版本冲突。
 
-详细对比请查看 [DataBinding使用说明.md](./DataBinding使用说明.md)
+## 依赖管理
 
-## 依赖项
+项目使用 **Version Catalog** 统一管理依赖版本，配置文件位于 `gradle/libs.versions.toml`。
 
-### Project build.gradle.kts
+### 主要依赖版本
 
-```kotlin
-plugins {
-    id("com.android.application") version "8.2.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.20" apply false
-    id("com.google.dagger.hilt.android") version "2.50" apply false
-}
+```toml
+[versions]
+kotlin = "1.9.25"
+agp = "8.2.2"
+ksp = "1.9.25-1.0.20"
+hilt = "2.51.1"
+lifecycle = "2.8.7"
+coroutines = "1.9.0"
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ```
 
-### App build.gradle.kts
+### 使用 KSP 替代 kapt
 
 ```kotlin
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.dagger.hilt.android")
-    id("kotlin-kapt")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)  // 使用 KSP
+    alias(libs.plugins.hilt)
 }
 
 dependencies {
-    // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    // Lifecycle runtime
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    
-    // Hilt
-    implementation("com.google.dagger:hilt-android:2.50")
-    kapt("com.google.dagger:hilt-android-compiler:2.50")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)  // 使用 ksp 而不是 kapt
 }
 ```
 
@@ -274,33 +269,72 @@ if (cachedUsers != users) {
 
 项目结构支持单元测试，建议为 ViewModel 和 Repository 添加测试用例。
 
+## 编译和运行
+
+### 环境要求
+
+- JDK 11 或更高版本（推荐 JDK 21）
+- Android Studio Hedgehog 或更高版本
+- Android SDK 34
+
+### 编译项目
+
+```bash
+# Windows
+.\gradlew.bat build
+
+# 编译 Debug APK
+.\gradlew.bat assembleDebug
+
+# 编译 Release APK
+.\gradlew.bat assembleRelease
+```
+
+### 安装到设备
+
+```bash
+# 安装 Debug 版本
+adb install app\build\outputs\apk\debug\app-debug.apk
+
+# 启动应用
+adb shell am start -n com.example.mvvmdemo/.MainActivity
+```
+
 ## 常见问题
 
 ### Q1: 为什么使用 StateFlow 而不是 LiveData？
 
-StateFlow 是 Kotlin Flow 的一部分，提供更强大的操作符和更好的协程集成。
+StateFlow 是 Kotlin Flow 的一部分，提供：
+- 更强大的操作符（map, filter, combine 等）
+- 更好的协程集成
+- 类型安全，编译时检查
+- 更现代的 API 设计
 
-### Q2: ViewBinding 和 DataBinding 应该选择哪个？
+### Q2: 为什么使用 KSP 而不是 kapt？
 
-- **ViewBinding**: 适合简单项目，编译快，学习成本低
-- **DataBinding**: 适合 MVVM 项目，真正的数据驱动 UI，支持双向绑定
-
-详细对比请查看 [DataBinding使用说明.md](./DataBinding使用说明.md)
+KSP (Kotlin Symbol Processing) 相比 kapt：
+- 编译速度提升 2 倍以上
+- 更好的 Kotlin 支持
+- 更低的内存占用
+- Google 官方推荐的注解处理方案
 
 ### Q3: 如何添加网络请求？
 
-取消注释 Retrofit 依赖，在 Repository 中注入 ApiService，替换模拟数据。
+1. 在 `libs.versions.toml` 中添加 Retrofit 依赖
+2. 创建 ApiService 接口
+3. 在 AppModule 中提供 Retrofit 实例
+4. 在 Repository 中注入 ApiService
 
 ### Q4: 如何添加数据库支持？
 
-添加 Room 依赖，创建 DAO 和 Database，在 Repository 中实现缓存逻辑。
+1. 添加 Room 依赖
+2. 创建 Entity、DAO 和 Database
+3. 在 Repository 中实现缓存逻辑
 
 ## 项目文档
 
 - [README.md](./README.md) - 项目概述和快速入门
 - [MVVM架构学习指南.md](./MVVM架构学习指南.md) - 详细的 MVVM 架构学习文档
-- [重构说明.md](./重构说明.md) - 从 LiveData 到 StateFlow 的重构说明
-- [DataBinding使用说明.md](./DataBinding使用说明.md) - DataBinding vs ViewBinding 对比
 
 ## 学习资源
 
